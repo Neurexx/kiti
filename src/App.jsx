@@ -207,10 +207,10 @@ const Whiteboard = () => {
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
+
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
     setIsDrawing(true);
     const ctx = canvas.getContext('2d');
     ctx.beginPath();
@@ -222,9 +222,9 @@ const Whiteboard = () => {
 
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
     const ctx = canvas.getContext('2d');
     ctx.lineTo(x, y);
     ctx.strokeStyle = color;
@@ -233,14 +233,13 @@ const Whiteboard = () => {
 
     // Send drawing data to server
     const drawData = {
-      type:"draw",
-      prevX: x - e.movementX,
-      prevY: y - e.movementY,
+      type: 'draw',
+      prevX: x - (e.touches ? 0 : e.movementX),
+      prevY: y - (e.touches ? 0 : e.movementY),
       currX: x,
       currY: y,
       color: color,
       brushSize: brushSize,
-      
     };
     
 
@@ -337,13 +336,16 @@ const Whiteboard = () => {
       
       <canvas
         ref={canvasRef}
-        width={1500}
-        height={600}
+        width={window.innerWidth}
+        height={1600}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseOut={stopDrawing}
-        className="border border-gray-300 rounded shadow-lg"
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+        className="border  border-gray-300 rounded shadow-lg"
       />
     </div>
   );
