@@ -96,7 +96,7 @@ const Whiteboard = () => {
   const handleHistory = (history) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    console.log(history)
+    
     // Clear canvas before applying history
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -104,7 +104,7 @@ const Whiteboard = () => {
     // Apply each command in order
     history.commands.forEach(command => {
       
-      console.log(command)
+      
       applyDrawCommand(command.payload);
     });
   };
@@ -117,13 +117,11 @@ const Whiteboard = () => {
 
     const wsUrl = `https://kiti-backend.onrender.com/ws?room=${roomId}`;
     wsRef.current = new WebSocket(wsUrl);
-    console.log(wsRef)
+
     wsRef.current.onopen=(event)=>{
-console.log(event)
     }
     wsRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log(data)
       switch (data.type) {
         case 'history':
           handleHistory(data);
@@ -244,7 +242,7 @@ console.log(event)
       brushSize: brushSize,
       
     };
-    console.log(drawData)
+    
 
     wsRef.current.send(JSON.stringify(drawData));
   };
