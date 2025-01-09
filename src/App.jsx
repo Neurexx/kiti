@@ -115,9 +115,12 @@ const Whiteboard = () => {
   useEffect(() => {
     window.history.replaceState(null, '', `?room=${roomId}`);
 
-    const wsUrl = `ws://localhost:8080/ws?room=${roomId}`;
+    const wsUrl = `https://kiti-backend.onrender.com/ws?room=${roomId}`;
     wsRef.current = new WebSocket(wsUrl);
-    
+    console.log(wsRef)
+    wsRef.current.onopen=(event)=>{
+console.log(event)
+    }
     wsRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       console.log(data)
