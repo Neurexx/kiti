@@ -60,6 +60,12 @@ const Whiteboard = () => {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+  const [touchCount, setTouchCount] = useState(0);
+  const [initialTouchDistance, setInitialTouchDistance] = useState(null);
+  const [initialScale, setInitialScale] = useState(1);
   const [roomId, setRoomId] = useState(() => {
     // Get room from URL or generate a random one
     const params = new URLSearchParams(window.location.search);
@@ -73,13 +79,7 @@ const Whiteboard = () => {
     
     switch (data.type) {
       case 'draw':
-        ctx.beginPath();
-        ctx.moveTo(data.prevX, data.prevY);
-        ctx.lineTo(data.currX, data.currY);
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.brushSize;
-        ctx.stroke();
-        ctx.closePath();
+        handleRemoteDrawing(data)
         break;
 
       case 'background':
@@ -117,8 +117,9 @@ const Whiteboard = () => {
 
     const wsUrl = `https://kiti-backend.onrender.com/ws?room=${roomId}`;
     wsRef.current = new WebSocket(wsUrl);
-
+    console.log(wsRef.current)
     wsRef.current.onopen=(event)=>{
+      console.log(event)
     }
     wsRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -157,27 +158,49 @@ const Whiteboard = () => {
   }, [user,roomId]);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    const resizeCanvas = () => {
+      // Save the current content
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(canvas, 0, 0);
+      
+      // Resize canvas
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      // Set canvas properties
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = brushSize;
+      
+      // Restore content
+      ctx.drawImage(tempCanvas, 0, 0);
+      updateBackground(backgroundColor);
+    };
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, []);
+
+  useEffect(() => {
     // Initialize canvas with background color
     updateBackground(backgroundColor);
   }, []);
 
   const updateBackground = (newColor) => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
     
-    // Save the current canvas content
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.drawImage(canvas, 0, 0);
+    canvas.style.backgroundColor=newColor
     
-    // Fill with new background color
-    ctx.fillStyle = newColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Restore the content
-    ctx.drawImage(tempCanvas, 0, 0);
+    
   };
 
   const changeBackground = (newColor) => {
@@ -204,40 +227,62 @@ const Whiteboard = () => {
   //   ctx.closePath();
   // };
 
+  const redrawCanvas = () => {
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    ctx.setTransform(scale, 0, 0, scale, offset.x, offset.y);
+  };
+
+  const getPointerPos = (e) => {
+     const rect = canvasRef.current.getBoundingClientRect();
+    const x = ((e.clientX || e.touches[0].clientX) - rect.left - offset.x) / scale;
+    const y = ((e.clientY || e.touches[0].clientY) - rect.top - offset.y) / scale;
+    return { x, y };
+  };
+
+  const getTouchDistance = (touch1, touch2) => {
+    return Math.hypot(
+      touch2.clientX - touch1.clientX,
+      touch2.clientY - touch1.clientY
+    );
+  };
+
   const startDrawing = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-
+    const pos = getPointerPos(e);
     setIsDrawing(true);
-    const ctx = canvas.getContext('2d');
+    setLastPos(pos);
+    
+    const ctx = canvasRef.current.getContext('2d');
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(pos.x, pos.y);
   };
 
   const draw = (e) => {
     if (!isDrawing) return;
 
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const pos = getPointerPos(e);
+    const ctx = canvasRef.current.getContext('2d');
 
-    const ctx = canvas.getContext('2d');
-    ctx.lineTo(x, y);
+    const movementX = pos.x - lastPos.x;
+    const movementY = pos.y - lastPos.y;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastPos.x, lastPos.y);
+    ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = color;
     ctx.lineWidth = brushSize;
     ctx.stroke();
+    
+    setLastPos(pos);
 
     // Send drawing data to server
     const drawData = {
       type: 'draw',
-      prevX: x - (e.touches ? 0 : e.movementX),
-      prevY: y - (e.touches ? 0 : e.movementY),
-      currX: x,
-      currY: y,
+      prevX: pos.x - movementX,
+      prevY: pos.y - movementY,
+      currX: pos.x,
+      currY: pos.y,
       color: color,
       brushSize: brushSize,
     };
@@ -250,10 +295,65 @@ const Whiteboard = () => {
     setIsDrawing(false);
   };
 
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    setTouchCount(e.touches.length);
+
+    if (e.touches.length === 1) {
+      startDrawing(e.touches[0]);
+    } else if (e.touches.length === 2) {
+      setIsDrawing(false);
+      setInitialTouchDistance(getTouchDistance(e.touches[0], e.touches[1]));
+      setInitialScale(scale);
+    }
+  };
+
+  const handleTouchMove = (e) => {
+  
+    
+    if (e.touches.length === 1 && isDrawing) {
+      draw(e.touches[0]);
+    } else if (e.touches.length === 2) {
+      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      const newScale = (currentDistance / initialTouchDistance) * initialScale;
+      
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      
+      setScale(Math.min(Math.max(newScale, 0.5), 3));
+      redrawCanvas();
+    }
+  
+  };
+
+  const handleTouchEnd = (e) => {
+    e.preventDefault();
+    setTouchCount(e.touches.length);
+    if (e.touches.length === 0) {
+      stopDrawing();
+    }
+  };
+
+  const handleRemoteDrawing = (drawData) => {
+    const ctx = canvasRef.current.getContext('2d');
+    
+    const { prevX, prevY, currX, currY, color: remoteColor, brushSize: remoteBrushSize } = drawData;
+    
+    ctx.beginPath();
+    ctx.moveTo(prevX * scale + offset.x, prevY * scale + offset.y);
+    ctx.lineTo(currX * scale + offset.x, currY * scale + offset.y);
+    ctx.strokeStyle = remoteColor;
+    ctx.lineWidth = remoteBrushSize;
+    ctx.stroke();
+  };
+
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(scale, 0, 0, scale, offset.x, offset.y);
+    updateBackground(backgroundColor);
     wsRef.current.send(JSON.stringify({ type: 'clear' }));
   };
 
@@ -334,19 +434,21 @@ const Whiteboard = () => {
         </div>
       </div>
       
-      <canvas
-        ref={canvasRef}
+      
+        <canvas
         width={window.innerWidth}
         height={1600}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseOut={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-        className="border  border-gray-300 rounded shadow-lg"
-      />
+          ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseOut={stopDrawing}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`border border-gray-300 rounded shadow-lg`}
+        />
+      
     </div>
   );
 };
