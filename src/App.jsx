@@ -128,10 +128,7 @@ const Whiteboard = () => {
 
     const wsUrl = `https://kiti-backend.onrender.com/ws?room=${roomId}`;
     wsRef.current = new WebSocket(wsUrl);
-    console.log(wsRef.current)
-    wsRef.current.onopen=(event)=>{
-      console.log(event)
-    }
+    
     wsRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       switch (data.type) {
