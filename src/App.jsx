@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
+
+
+
 const LoginScreen = ({ onLogin }) => {
   const [userName, setUserName] = useState('');
 
@@ -60,6 +63,7 @@ const Whiteboard = () => {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [color, setColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
+  const [textSize, setTextSize] = useState(20);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
@@ -71,6 +75,7 @@ const Whiteboard = () => {
     const params = new URLSearchParams(window.location.search);
     return params.get('room') || Math.random().toString(36).substring(7);
   });
+  const [activity,setActivity]=useState("draw")
 
 
   const applyDrawCommand = (data) => {
@@ -80,6 +85,12 @@ const Whiteboard = () => {
     switch (data.type) {
       case 'draw':
         handleRemoteDrawing(data)
+        break;
+      
+      case 'text':
+        ctx.font = `${data.textSize}px Arial`;
+        ctx.fillStyle = data.color;
+        ctx.fillText(data.text, data.x, data.y);
         break;
 
       case 'background':
@@ -140,6 +151,7 @@ const Whiteboard = () => {
           break;
         case 'draw':
         case 'background':
+        case 'text':
         case 'clear':
           applyDrawCommand(data);
           if (data.userId !== user.id) {
@@ -347,6 +359,58 @@ const Whiteboard = () => {
     ctx.stroke();
   };
 
+  const handleText=(e)=>{
+   
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.font = `${textSize}px Arial`;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.style.position = 'absolute';
+    input.style.left = e.clientX + 'px';
+    input.style.top = e.clientY + 'px';
+    input.style.color = color;
+    input.style.fontSize = textSize + 'px';
+
+    document.body.appendChild(input);
+    input.focus();
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.font = `${textSize}px Arial`;
+        ctx.fillStyle = color;
+        const pos = getPointerPos(e);
+        ctx.fillText(input.value, pos.x, pos.y);
+
+        wsRef.current.send(JSON.stringify({
+          type: 'text',
+          text: input.value,
+          x: pos.x,
+          y: pos.y,
+          color: color,
+          textSize
+        }));
+
+        document.body.removeChild(input);
+      }
+      if (event.key === 'Escape') {
+        document.body.removeChild(input);
+      }
+
+
+    });
+
+
+
+
+
+
+  
+
+
+  
+  }
+
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -424,6 +488,26 @@ const Whiteboard = () => {
               className="w-32"
             />
           </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">Text Size</span>
+            <input
+              type="range"
+              min="10"
+              max="50"
+              value={textSize}
+              onChange={(e) => setTextSize(parseInt(e.target.value))}
+              className="w-32"
+            />
+          </div>
+
+
+
+          <div className="flex flex-col gap-2">
+            <button className={`border-2 rounded-sm p-2 hover:bg-zinc-800 ${activity==="text"?"bg-white text-black":""}`} onClick={()=>{setActivity("text")}}>Text</button>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button className={`border-2 rounded-sm p-2 hover:bg-zinc-800 ${activity==="draw"?"bg-white text-black":""}`} onClick={()=>{setActivity("draw")}}>Draw</button>
+          </div>
           
           <button
             onClick={clearCanvas}
@@ -439,7 +523,16 @@ const Whiteboard = () => {
         width={window.innerWidth}
         height={1600}
           ref={canvasRef}
-          onMouseDown={startDrawing}
+          onMouseDown={(e)=>{
+          if(activity==="draw"){
+          startDrawing(e)
+          }
+          else{
+            handleText(e)
+          }
+          
+          
+          }}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseOut={stopDrawing}
