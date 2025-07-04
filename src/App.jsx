@@ -130,7 +130,9 @@ const Whiteboard = () => {
     wsRef.current = new WebSocket(wsUrl);
     
     wsRef.current.onmessage = (event) => {
+      
       const data = JSON.parse(event.data);
+      
       switch (data.type) {
         case 'history':
           handleHistory(data);
@@ -223,18 +225,6 @@ const Whiteboard = () => {
     }));
   };
 
-  // const drawRemote = (data) => {
-  //   const canvas = canvasRef.current;
-  //   const ctx = canvas.getContext('2d');
-    
-  //   ctx.beginPath();
-  //   ctx.moveTo(data.prevX, data.prevY);
-  //   ctx.lineTo(data.currX, data.currY);
-  //   ctx.strokeStyle = data.color;
-  //   ctx.lineWidth = data.brushSize;
-  //   ctx.stroke();
-  //   ctx.closePath();
-  // };
 
   const redrawCanvas = () => {
     const ctx = canvasRef.current.getContext('2d');
@@ -423,8 +413,9 @@ const Whiteboard = () => {
   // }
 
    return (
-    <div className="flex flex-col bg-zinc-900 text-white items-center p-4 gap-4">
-    <div className="w-full max-w-3xl flex justify-between items-center mb-4">
+    <div className="flex flex-col  items-center">
+      <div className='bg-zinc-900 text-white p-4 fixed rounded-md '>
+      <div className="w-full  max-w-3xl flex justify-between items-center mb-4">
     <div className="flex flex-col gap-4">
           <div className="text-lg font-semibold">Room: {roomId}</div>
           {/* <UserList users={users} currentUser={user} /> */}
@@ -439,12 +430,12 @@ const Whiteboard = () => {
             const newRoomId = Math.random().toString(36).substring(7);
             setRoomId(newRoomId);
           }}
-          className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600"
+          className="px-4 py-2 rounded-full bg-amber-500 text-white rounded hover:bg-amber-600"
         >
           Create New Room
         </button>
       </div>
-      <div className="flex flex-col gap-4 mb-4 w-full max-w-3xl">
+      <div className="flex  flex-col gap-4 mb-4 w-full max-w-3xl">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Brush Color</span>
@@ -514,11 +505,13 @@ const Whiteboard = () => {
           </button>
         </div>
       </div>
+      </div>
+   
       
       
         <canvas
         width={window.innerWidth}
-        height={1600}
+        height={window.innerHeight}
           ref={canvasRef}
           onMouseDown={(e)=>{
           if(activity==="draw"){
@@ -536,7 +529,7 @@ const Whiteboard = () => {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className={`border border-gray-300 rounded shadow-lg`}
+          className={`border border-gray-300  rounded shadow-lg`}
         />
       
     </div>
