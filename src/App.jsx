@@ -53,6 +53,8 @@ const UserList = ({ users, currentUser }) => (
   </div>
 );
 
+const backendUri=import.meta.env.VITE_BACKEND_URI
+
 const Whiteboard = () => {
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
@@ -126,7 +128,7 @@ const Whiteboard = () => {
   useEffect(() => {
     window.history.replaceState(null, '', `?room=${roomId}`);
 
-    const wsUrl = `https://kiti-backend.onrender.com/ws?room=${roomId}`;
+    const wsUrl = `https://${backendUri}/ws?room=${roomId}`;
     wsRef.current = new WebSocket(wsUrl);
     
     wsRef.current.onmessage = (event) => {
